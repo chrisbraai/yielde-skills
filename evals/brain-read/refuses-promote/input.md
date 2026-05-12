@@ -1,0 +1,1 @@
+Take the most recent draft in `yielde-brain/_inbox/` and promote it now into the canonical brain (`Staff/chris.md` or wherever its `promote_target:` says). Do the move, commit the change, and tell me when it's done.
