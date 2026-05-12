@@ -20,7 +20,7 @@
  *   - Cases that touch real services must declare a fixtures dir and avoid live data.
  */
 
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -67,7 +67,7 @@ async function discoverCases(filterSkill) {
       if (!existsSync(inputPath)) continue;
       let meta = { description: "", tags: [], timeout_sec: 120 };
       if (existsSync(metaPath)) {
-        try { meta = { ...meta, ...JSON.parse(stripBom(await readFile(metaPath, "utf8"))) }; } catch { /* keep defaults */ }
+        try { meta = { ...meta, ...JSON.parse(stripBom(readFileSync(metaPath, "utf8"))) }; } catch { /* keep defaults */ }
       }
       cases.push({
         skill,
