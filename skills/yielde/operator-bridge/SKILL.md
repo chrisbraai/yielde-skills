@@ -27,36 +27,49 @@ Programmatic dispatch into `/operator` from inside another skill or agent contex
 
 ## Procedure
 
-1. **Check the registry.** Read `C:\Users\chris\.claude\operator\registry.json`. Verify the requested agent name exists and its `status` is `verified` or `draft` (never deploy `retired`).
+The dispatch path is implemented in `yielde-skills/scripts/operator-bridge-dispatch.mjs`. Invoke it via Bash; never re-implement the tier logic inside the skill body.
 
-2. **Verify inputs.** Read the agent manifest at `C:\Users\chris\.claude\operator\agents\<name>.md`. Validate that all required `inputs` are present in the caller's request. Reject with a clear error if anything is missing — never invent values.
+1. **Validate the request.** Required: `--name <agent>`. Optional: any number of `--input key=value`, plus `--reason`, `--author`, `--session-id`. Reject with a clear error if a required value is missing — never invent input values.
 
-3. **Dispatch on Chris's machine.** Shell out:
+2. **Invoke the dispatch CLI.**
 
-   ```powershell
-   & "C:\Users\chris\.claude\operator\lib\operator.ps1" deploy <name> @args
+   ```bash
+   node C:/Users/chris/yielde-skills/scripts/operator-bridge-dispatch.mjs \
+     --name <agent> \
+     --input key1=value1 --input key2=value2 \
+     --reason "<why this is needed>" \
+     --author "<caller>" \
+     --session-id "<session_id>"
    ```
 
-   Where `@args` are `--key=value` pairs derived from the validated inputs.
+   The script prints a single JSON object to stdout:
 
-4. **Capture the run_id.** The CLI writes a JSONL log at `~/.claude/operator/runs/<name>/<YYYY-MM-DD-HHMM>.jsonl`. The run_id is the timestamp portion. Return it to the caller.
+   - **Tier 1** (Chris's machine, `~/.claude/operator/` present): records `dispatch.intent` + `dispatch.queued` events at `~/.claude/operator/runs/<name>/<run-id>.jsonl` and returns `{ ok, tier: 1, agent, run_id, run_log, inputs }`. The interactive `/operator deploy` or cron sweep then executes the agent for real.
+   - **Tier 2** (Devon / Lyell, no operator dir): opens a GitHub issue against `chrisbraai/yielde-brain` (override via `YIELDE_BRAIN_REPO`) with label `operator-request` and returns `{ ok, tier: 2, agent, issue_url, repo, inputs }`. Chris's machine sweeps these and dispatches the matching agent.
 
-5. **Tail the log.** If the caller wants synchronous behavior, tail the JSONL until the final `operator.run.end` event is written. If async, return the run_id and let the caller poll.
+3. **Surface the response.** Return the parsed JSON to the caller. If `ok: false`, propagate the error. If `tier: 2`, tell the user "Operator unavailable locally — issue opened: \<issue_url\>".
+
+4. **Smoke test the Tier-2 path.** Set `YIELDE_OPERATOR_DIR=/nonexistent` to force the GitHub-issue branch even on Chris's machine. This is the standard verification before shipping a change to this skill.
 
 ## Co-founder fallback (Tier 2 — Devon / Lyell)
 
-If `~/.claude/operator/` does not exist on the running machine (Devon's or Lyell's), do not error. Instead, **open a GitHub issue** against the `yielde-brain` repo with a structured body:
+The fallback is implemented in the same dispatch CLI; this section documents the contract.
+
+Issue body shape (rendered by `operator-bridge-dispatch.mjs`):
 
 ```markdown
 **Operator request from <author>**
 
-Agent: <name>
-Inputs:
-- key1: value1
-- key2: value2
+**Agent**: `<name>`
+**Originating session**: `<session_id>`
 
-Reason: <why this is needed>
-Originating session: <session_id>
+**Reason**: <why this is needed>
+
+**Inputs**:
+- `key1`: `value1`
+- `key2`: `value2`
+
+Promote on the Tier-1 machine with: `/operator deploy <name>`.
 ```
 
 Label: `operator-request`. Chris's machine polls these issues and dispatches matching ones via `/operator deploy`. Result is posted back as an issue comment.
