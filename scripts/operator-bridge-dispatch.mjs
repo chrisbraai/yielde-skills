@@ -20,11 +20,12 @@
  * Always prints a single JSON object to stdout.
  */
 
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { stripLibuvNoise, readJsonOrDefaultSync } from "./io-utils.mjs";
 
 function parseArgs(argv) {
   const out = { input: [] };
@@ -39,26 +40,6 @@ function parseArgs(argv) {
     }
   }
   return out;
-}
-
-function stripBom(s) {
-  return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
-}
-
-function readJsonSafe(path, fallback) {
-  try {
-    return JSON.parse(stripBom(readFileSync(path, "utf8")));
-  } catch {
-    return fallback;
-  }
-}
-
-function stripLibuvNoise(s) {
-  if (!s) return s;
-  return s
-    .split(/\r?\n/)
-    .filter((line) => !/Assertion failed:.*UV_HANDLE_CLOSING/.test(line))
-    .join("\n");
 }
 
 function makeRunId() {
@@ -113,7 +94,7 @@ const operatorDirExists = existsSync(operatorDir);
 if (operatorDirExists) {
   const registryPath = join(operatorDir, "registry.json");
   const manifestPath = join(operatorDir, "agents", `${name}.md`);
-  const registry = readJsonSafe(registryPath, null);
+  const registry = readJsonOrDefaultSync(registryPath, null);
 
   if (registry?.agents && !registry.agents[name]) {
     console.log(JSON.stringify({

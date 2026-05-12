@@ -25,6 +25,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { stripBom } from "./io-utils.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = dirname(HERE);
@@ -41,8 +42,6 @@ function parseArgs(argv) {
   }
   return out;
 }
-
-function stripBom(s) { return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s; }
 
 async function isDir(p) {
   try { return (await stat(p)).isDirectory(); } catch { return false; }

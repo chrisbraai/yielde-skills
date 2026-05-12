@@ -6,22 +6,10 @@
 import { readdir, readFile, writeFile, stat } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseFrontmatter } from "./io-utils.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILLS_ROOT = join(__dirname, "..", "skills");
-
-function parseFrontmatter(src) {
-  const m = src.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
-  if (!m) return null;
-  const fm = {};
-  for (const line of m[1].split(/\r?\n/)) {
-    const kv = line.match(/^([a-z_]+):\s*(.*)$/i);
-    if (!kv) continue;
-    const [, key, val] = kv;
-    fm[key] = val.replace(/^["']|["']$/g, "").trim();
-  }
-  return fm;
-}
 
 async function walk(dir, out = []) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -46,14 +34,14 @@ for (const file of files) {
     .replace(/\/SKILL\.md$/, "");
   const [category, name] = rel.split("/");
   const src = await readFile(file, "utf8");
-  const fm = parseFrontmatter(src);
-  if (!fm) continue;
+  const { fm } = parseFrontmatter(src);
+  if (!fm.name && !fm.description) continue;
   skills.push({
     category,
     name: fm.name || name,
     description: fm.description || "",
     provenance: fm.provenance || "unknown",
-    pinned: fm.pinned === "true",
+    pinned: fm.pinned === true || fm.pinned === "true",
     version: fm.version || "0.0.0",
   });
 }

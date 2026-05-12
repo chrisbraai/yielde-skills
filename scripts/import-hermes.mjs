@@ -21,6 +21,7 @@
 import { writeFile, mkdir, readFile, stat } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseFrontmatter } from "./io-utils.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILLS_ROOT = join(__dirname, "..", "skills");
@@ -93,87 +94,6 @@ async function resolveSource(input) {
     url: `https://raw.githubusercontent.com/${DEFAULT_REPO}/main/${match.path}`,
     source: `${DEFAULT_REPO}:${match.path}@main`,
   };
-}
-
-// Indentation-aware YAML parser handling: strings, bools, ints, flow arrays,
-// block scalars (`|`/`>`), and one level of nested mappings (sufficient for
-// Hermes `metadata.hermes.*`). Not a general YAML parser — purpose-built.
-function parseFrontmatter(src) {
-  const m = src.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!m) throw new Error("missing or malformed frontmatter");
-  const lines = m[1].split(/\r?\n/);
-  const body = m[2];
-
-  function coerce(val) {
-    val = val.replace(/^["']|["']$/g, "");
-    if (val === "true") return true;
-    if (val === "false") return false;
-    if (/^-?\d+$/.test(val)) return parseInt(val, 10);
-    return val;
-  }
-
-  function parseArray(val) {
-    return val
-      .slice(1, -1)
-      .split(",")
-      .map((s) => s.trim().replace(/^["']|["']$/g, ""))
-      .filter(Boolean);
-  }
-
-  const root = {};
-  let i = 0;
-
-  function readNode(indent) {
-    const out = {};
-    while (i < lines.length) {
-      const line = lines[i];
-      if (!line.trim()) { i++; continue; }
-      const leading = line.match(/^(\s*)/)[1].length;
-      if (leading < indent) return out;
-      if (leading > indent) { i++; continue; }
-
-      const kv = line.slice(indent).match(/^([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/);
-      if (!kv) { i++; continue; }
-      const key = kv[1];
-      const rawVal = kv[2];
-
-      if (rawVal === "") {
-        // Nested mapping
-        i++;
-        out[key] = readNode(indent + 2);
-        continue;
-      }
-
-      if (rawVal === "|" || rawVal === ">" || rawVal === "|-" || rawVal === ">-") {
-        i++;
-        const block = [];
-        const blockIndent = indent + 2;
-        while (i < lines.length) {
-          const bl = lines[i];
-          if (bl.trim() === "") { block.push(""); i++; continue; }
-          const bLead = bl.match(/^(\s*)/)[1].length;
-          if (bLead < blockIndent) break;
-          block.push(bl.slice(blockIndent));
-          i++;
-        }
-        out[key] = block.join("\n").trim();
-        continue;
-      }
-
-      if (rawVal.startsWith("[") && rawVal.endsWith("]")) {
-        out[key] = parseArray(rawVal);
-        i++;
-        continue;
-      }
-
-      out[key] = coerce(rawVal);
-      i++;
-    }
-    return out;
-  }
-
-  Object.assign(root, readNode(0));
-  return { fm: root, body };
 }
 
 function quoteYamlString(v) {
