@@ -1,0 +1,17 @@
+# yielde-skills/_pending/
+
+Holds bulk-imported Hermes skill drafts awaiting Chris's `--operator chris`
+promotion (Phase 7 deliverable 6d).
+
+Drafts land here via:
+
+    node scripts/import-hermes.mjs --bulk [--filter S] [--limit N]
+
+Promotion stays Chris-only via the explicit curator gate:
+
+    node scripts/import-hermes.mjs --promote <name> --operator chris
+
+The yielde-bridge `/inspect/hermes-pending` panel surfaces what's here
+read-only — Bridge cannot promote anything itself.
+
+This .gitkeep stays so the dir tracks empty between bulk runs.
