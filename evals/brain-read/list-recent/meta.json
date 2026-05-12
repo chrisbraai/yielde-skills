@@ -1,0 +1,5 @@
+{
+  "description": "brain-read should list the 5 most recent files in yielde-brain/_inbox/ sorted newest-first.",
+  "tags": ["brain-read", "smoke"],
+  "timeout_sec": 60
+}
